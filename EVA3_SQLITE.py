@@ -511,6 +511,66 @@ while True:
                 except:
                     print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
                 break
-          
+        case 5:
+            print("\n===============Registrar una sala===============\n")
+            while True:
+                nombre_sala = input("Ingrese el nombre de la sala: ")
+                if not nombre_sala:
+                    print("El nombre de la sala no puede estar vacio\n") 
+                    continue
+                if nombre_sala.isdigit():
+                    print("El nombre de la sala no puede ser un numero\n")
+                    continue
+                if nombre_sala.isspace():
+                    print("El nombre de la sala no puede consistir solo en espacios en blanco\n")
+                    continue
+                valor = (nombre_sala.upper(),)
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        mi_cursor.execute("SELECT NOMBRE FROM SALAS WHERE NOMBRE = ?", valor)
+                        registros = mi_cursor.fetchall()
+                        if registros:
+                            print("El nombre de la sala ya existe\n")
+                            continue
+                except Error as e:
+                    print (e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                break
+            
+            while True:    
+                try:
+                    capacidad = int(input("Ingrese la capacidad de la sala: "))
+                except ValueError:
+                    print("Favor de digitar un numero valido\n")
+                    continue
+                if capacidad <= 0:
+                    print("La capacidad debe ser mayor a 0")
+                    continue
+                valores = (nombre_sala.upper(), capacidad)
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        mi_cursor.execute("INSERT INTO SALAS (NOMBRE, CAPACIDAD) VALUES(?,?)", valores)
+                        print("\n Sala registrada exitosamente")
+                except Error as e:
+                    print (e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                break
+                
+        
+        case 6:
+            decision = input("Escriba C para confirmar la salida del programa, para regresar al menu principal digite cualquier otra tecla: ")
+            if decision.upper() == "C":
+                print("*"*70)
+                print("***Gracias por usar el sistema de reservacion, vuelva pronto***")
+                print("*"*70)
+                break
+            continue
+        
+        case _:
+            print("\nOpcion no valida, favor de intentarlo de nuevo")                    
 
 
