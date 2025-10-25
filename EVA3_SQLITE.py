@@ -215,3 +215,114 @@ while True:
                 except:
                     print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
                 break 
+               
+        case 2:
+            print("\n===============Editar nombre del evento===============\n")
+            
+            while True:
+                fecha_inicio = input("Ingrese desde que fecha consultar los eventos (dd/mm/aaaa): ")
+                try:
+                    fecha_inicio = dt.datetime.strptime(fecha_inicio, "%d/%m/%Y").date()
+                    fecha_inicio_iso = fecha_inicio.isoformat()
+                    break
+                except ValueError:
+                    print("Favor de digitar una fecha valida\n")
+                    continue
+
+            while True:
+                fecha_fin = input("Ingrese hasta que fecha consultar los eventos (dd/mm/aaaa): ")
+                try:
+                    fecha_fin = dt.datetime.strptime(fecha_fin, "%d/%m/%Y").date()
+                    if fecha_fin < fecha_inicio:
+                        print("La fecha final no puede ser menor a la fecha inicial\n")
+                        continue
+                    fecha_fin_iso = fecha_fin.isoformat()
+                    break
+                except ValueError:
+                    print("Favor de digitar una fecha valida\n")
+                    continue
+
+            eventos_en_rango = []
+            folios_eventos_validos = []
+            
+            try:
+                with sqlite3.connect("Eventos.db", detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    mi_cursor = conn.cursor()
+                    consulta = """
+                        SELECT E.ID_EVENTO, S.NOMBRE, C.NOMBRE, C.APELLIDO, E.NOMBRE_EVENTO, E.TURNO, DATE(E.FECHA)
+                        FROM EVENTOS AS E INNER JOIN SALAS AS S ON E.ID_SALA = S.ID_SALA
+                        INNER JOIN CLIENTES AS C ON E.ID_CLIENTE = C.ID_CLIENTE
+                        WHERE DATE(E.FECHA) BETWEEN ? AND ?
+                    """
+                    valores = (fecha_inicio_iso, fecha_fin_iso)
+                    mi_cursor.execute(consulta, valores)
+                    eventos_en_rango = mi_cursor.fetchall() 
+                    folios_eventos_validos = [evento[0] for evento in eventos_en_rango]
+            except Error as e:
+                print(f"Error de base de datos al consultar eventos: {e}")
+                continue
+            except:
+                print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                continue
+
+            if not eventos_en_rango:
+                print(f"\nNo hay eventos registrados entre {fecha_inicio} y {fecha_fin}\n")
+                continue
+            else:
+                print(f"\n\t**********Eventos registrados entre {fecha_inicio} y {fecha_fin}**********")
+                
+                filas_tabla_eventos = []
+                for evento in eventos_en_rango:
+                    folio = evento[0]
+                    nombre_sala = evento[1]
+                    nombre_cliente = f"{evento[2]} {evento[3]}"
+                    nombre_evento = evento[4]
+                    turno_evento = evento[5]
+                    fecha_evento = evento[6]
+                    
+                    filas_tabla_eventos.append([folio, nombre_sala, nombre_cliente, nombre_evento, turno_evento, fecha_evento])
+                
+                headers = ["Folio del evento", "Sala", "Cliente", "Evento", "Turno", "Fecha"]
+                tabla = tabulate(filas_tabla_eventos, headers, tablefmt="fancy_grid", stralign="center", numalign="center")
+                print(tabla)
+
+            while True:
+                try:
+                    folio_evento_elegido = int(input("Ingrese el folio del evento a editar: "))
+                    if folio_evento_elegido not in folios_eventos_validos:
+                        print("Elegir folio de evento dentro de las opciones mostradas\n")
+                        print(tabla)
+                        continue
+                    break
+                except ValueError:
+                    print("Favor de digitar un numero valido\n")
+                    continue
+                    
+            while True:
+                nuevo_nombre_evento = input("Ingrese el nuevo nombre del evento: ")
+                if not nuevo_nombre_evento:
+                    print("El nombre del evento no puede estar vacio\n")
+                    continue
+                if nuevo_nombre_evento.isspace():
+                    print("El nombre del evento no puede consistir solo en espacios en blanco\n")
+                    continue
+                if nuevo_nombre_evento.isdigit():
+                    print("El nombre del evento no puede ser un numero\n")
+                    continue
+                nuevo_nombre = nuevo_nombre_evento.upper()
+                valores = (nuevo_nombre, folio_evento_elegido)
+                
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        mi_cursor.execute("UPDATE EVENTOS SET NOMBRE_EVENTO = ? WHERE ID_EVENTO = ?", valores)
+                        print("***Nombre del evento editado con exito***")
+                        break
+                except Error as e:
+                    print(f"Error de base de datos al actualizar el evento: {e}")
+                    break
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                    break
+              
+                
