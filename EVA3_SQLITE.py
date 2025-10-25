@@ -324,5 +324,193 @@ while True:
                 except:
                     print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
                     break
-              
+        case 3:
+            print("\n===============Consultar reservaciones===============\n")
+
+            while True:
+                fecha_consultada = input(f"Ingrese la fecha a consultar (dd/mm/aaaa) o dejar vacio para signar la fecha de hoy: ")
                 
+                if not fecha_consultada:
+                    fecha_consulta_dt = dt.date.today()
+                    fecha_consultada = dt.date.today() 
+                    fecha_consulta_iso = fecha_consulta_dt.isoformat()
+                    break
+                    
+                try:
+                    fecha_consulta_dt = dt.datetime.strptime(fecha_consultada, "%d/%m/%Y").date()
+                    fecha_consulta_iso = fecha_consulta_dt.isoformat()
+                    break
+                except ValueError:
+                    print("Favor de digitar una fecha valida\n")
+                    continue
+        
+            filas_tabla = []    
+            try:
+                with sqlite3.connect("Eventos.db", detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    mi_cursor = conn.cursor()
+                    consulta = """
+                        SELECT S.NOMBRE, C.NOMBRE, C.APELLIDO, E.NOMBRE_EVENTO, E.TURNO
+                        FROM EVENTOS AS E INNER JOIN SALAS AS S ON E.ID_SALA = S.ID_SALA
+                        INNER JOIN CLIENTES AS C ON E.ID_CLIENTE = C.ID_CLIENTE
+                        WHERE DATE(E.FECHA) = ?
+                    """
+                    valores = (fecha_consulta_iso,)
+                    mi_cursor.execute(consulta, valores)            
+                    eventos_en_fecha = mi_cursor.fetchall()
+            except Error as e:
+                print(f"Error de base de datos al consultar eventos: {e}")
+                continue
+            except:
+                print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                continue
+
+            fecha_para_mostrar = fecha_consulta_dt.strftime('%d/%m/%Y') 
+            
+            if not eventos_en_fecha:
+                print(f"\nNo hay eventos registrados para la fecha {fecha_consultada}\n")
+                continue
+            else:
+                for evento in eventos_en_fecha:
+                    nombre_sala = evento[0]
+                    nombre_cliente = f"{evento[1]} {evento[2]}"
+                    nombre_evento = evento[3]
+                    turno = evento[4]
+                    
+                    filas_tabla.append([nombre_sala, nombre_cliente, nombre_evento, turno])
+                        
+                headers = ["SALA","CLIENTE","EVENTO","TURNO"]
+
+                tabla = tabulate(filas_tabla, headers, tablefmt="fancy_grid", stralign="center", numalign="center")
+
+                print("*" * 70)
+                print(f"\t** REPORTE DE RESERVACIONES PARA LA FECHA {fecha_consultada} **")
+                print("*" * 70)
+                print(tabla)
+                print("*" * 70)
+                print("\t**\t\tFIN DEL REPORTE\t\t**")    
+                print("*" * 70)
+                
+                while True:
+                    print("\n==========Menu de exportacion de datos==========")
+                    print("A. Guardar en JSON")
+                    print("B. Guardar en CSV")
+                    print("C. Guardar en Excel")
+                    opcion_exportacion = input("Ingrese una opcion o bien digite alguna otra tecla para regresar al menu principal: ")
+                    
+                    datos_a_exportar = [headers] + filas_tabla
+                    nombre_base_archivo = "reservaciones"
+                    
+                    match opcion_exportacion.upper():
+                        case "A":
+                            datos_json = {
+                                "fecha_consulta": fecha_consultada, 
+                                "reservaciones": [{"sala": fila[0],
+                                                "cliente": fila[1],
+                                                "evento": fila[2],
+                                                "turno": fila[3]
+                                } for fila in filas_tabla]
+                            }
+                            
+                            try:
+                                with open("reservaciones.json", "w") as archivo:
+                                    json.dump(datos_json, archivo, indent=4)
+                                print("Datos guardados correctamente en formato JSON")
+                            except Exception as e:
+                                print(f"Error al guardar en JSON: {e}")
+
+                        case "B":
+                            try:
+                                with open("reservaciones.csv","w", encoding="latin1", newline="") as archivo:
+                                    grabador=csv.writer(archivo)
+                                    grabador.writerows(datos_a_exportar)
+                                print("Datos guardados correctamente en formato CSV")
+                            except Exception as e:
+                                print(f"Error al guardar en CSV: {e}")
+
+                        case "C":
+                            try:
+                                libro = openpyxl.Workbook()
+                                hoja = libro.active
+                                hoja.title = "Reservaciones"
+                                negritas = Font(bold=True)
+                                borde_inferior = Border(bottom=Side(border_style="thick")) 
+                                centrado = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+                                for col_num, header in enumerate(headers, start=1):
+                                    celda = hoja.cell(row=1, column=col_num, value=header)
+                                    celda.font = negritas
+                                    celda.border = borde_inferior
+                                    celda.alignment = centrado
+                                
+                                for fila_num, fila in enumerate(filas_tabla, start=2):
+                                    for col_num, valor in enumerate(fila, start=1):
+                                        celda = hoja.cell(row=fila_num, column=col_num, value=valor)
+                                        celda.alignment = centrado
+
+                                for col in ["A","B","C","D"]:
+                                    hoja.column_dimensions[col].width = 30 
+
+                                libro.save(f"reservaciones.xlsx") 
+                                print("ARCHIVO EXCEL GENERADO")
+                                print("Datos guardados correctamente en formato Excel")
+                            except Exception as e:
+                                print(f"Error al guardar en Excel: {e}")
+
+                        case _:
+                            break
+                    break
+        
+        case 4:
+            print("\n===============Registrar un cliente===============\n")
+            while True:
+                nombre = input("Ingrese nombre(s) del cliente: ")
+                if not nombre:
+                    print("El nombre no puede estar vacio\n") 
+                    continue
+                elif nombre.isdigit():
+                    print("El nombre no puede ser un numero\n")    
+                    continue
+                elif nombre.isspace():
+                    print("El nombre no puede consistir solo en espacios en blanco\n")
+                    continue
+                else:
+                    break
+                
+            while True:
+                apellido = input("Ingrese los apellidos del cliente: ")
+                if not apellido:
+                    print("El apellido no puede estar vacio\n") 
+                    continue
+                elif apellido.isdigit():
+                    print("El apellido no puede ser un numero\n")
+                    continue
+                if apellido.isspace():
+                    print("El apellido no puede consistir solo en espacios en blanco\n")
+                    continue
+                valores = (nombre.upper(), apellido.upper())
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        mi_cursor.execute("SELECT NOMBRE FROM CLIENTES WHERE NOMBRE = ? AND APELLIDO = ?", valores)
+                        registros = mi_cursor.fetchall()
+                        if registros:
+                            print("Ese cliente ya esta registrado\n")
+                            continue
+                except Error as e:
+                    print (e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        mi_cursor.execute("INSERT INTO CLIENTES (NOMBRE, APELLIDO) VALUES(?,?)", valores)
+                        print("\n***Cliente registrado exitosamente***")
+                except Error as e:
+                    print (e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                break
+          
+
+
