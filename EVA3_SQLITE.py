@@ -20,7 +20,7 @@ try:
         print("Tabla CLIENTES creada exitosamente")
         mi_cursor.execute("CREATE TABLE IF NOT EXISTS SALAS (ID_SALA INTEGER PRIMARY KEY, NOMBRE TEXT NOT NULL, CAPACIDAD INTEGER NOT NULL);")
         print("Tabla SALAS creada exitosamente")
-        mi_cursor.execute("CREATE TABLE IF NOT EXISTS EVENTOS (ID_EVENTO INTEGER PRIMARY KEY, ID_SALA INTEGER, ID_CLIENTE INTEGER, NOMBRE_EVENTO TEXT NOT NULL, TURNO TEXT NOT NULL, FECHA timestamp, FOREIGN KEY (ID_SALA) REFERENCES SALAS(ID_SALA), FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES(ID_CLIENTE));")
+        mi_cursor.execute("CREATE TABLE IF NOT EXISTS EVENTOS (ID_EVENTO INTEGER PRIMARY KEY, ID_SALA INTEGER, ID_CLIENTE INTEGER, NOMBRE_EVENTO TEXT NOT NULL, TURNO TEXT NOT NULL, FECHA timestamp, ESTADO TEXT DEFAULT 'RESERVADO', FOREIGN KEY (ID_SALA) REFERENCES SALAS(ID_SALA), FOREIGN KEY (ID_CLIENTE) REFERENCES CLIENTES(ID_CLIENTE));")
         print("Tabla EVENTOS creada exitosamente")
 except Error as e:
     print (e)
@@ -36,9 +36,10 @@ while True:
     print("1.Registrar evento")
     print("2.Editar nombre del evento")
     print("3.Consultar reservaciones")
-    print("4.Registrar cliente")
-    print("5.Registrar sala")
-    print("6.Salir")
+    print("4.Cancelar reservación") 
+    print("5.Registrar cliente") 
+    print("6.Registrar sala")    
+    print("7.Salir")             
     print("="*34)
     
     try:
@@ -459,8 +460,33 @@ while True:
                         case _:
                             break
                     break
-        
         case 4:
+            print("\n===============Cancelar reservación===============\n")
+            
+            # --- 1. SOLICITAR RANGO DE FECHAS Y MOSTRAR RESERVACIONES ACTIVAS ---
+            while True:
+                fecha_inicio_str = input("Ingrese DESDE qué fecha consultar (dd/mm/aaaa): ")
+                try:
+                    fecha_inicio = dt.datetime.strptime(fecha_inicio_str, "%d/%m/%Y").date()
+                    fecha_inicio_iso = fecha_inicio.isoformat()
+                    break
+                except ValueError:
+                    print("Favor de digitar una fecha válida\n")
+                    continue
+
+            while True:
+                fecha_fin_str = input("Ingrese HASTA qué fecha consultar (dd/mm/aaaa): ")
+                try:
+                    fecha_fin = dt.datetime.strptime(fecha_fin_str, "%d/%m/%Y").date()
+                    if fecha_fin < fecha_inicio:
+                        print("La fecha final no puede ser anterior a la fecha inicial\n")
+                        continue
+                    fecha_fin_iso = fecha_fin.isoformat()
+                    break
+                except ValueError:
+                    print("Favor de digitar una fecha válida\n")
+                    continue
+        case 5:
             print("\n===============Registrar un cliente===============\n")
             while True:
                 nombre = input("Ingrese nombre(s) del cliente: ")
@@ -511,7 +537,7 @@ while True:
                 except:
                     print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
                 break
-        case 5:
+        case 6:
             print("\n===============Registrar una sala===============\n")
             while True:
                 nombre_sala = input("Ingrese el nombre de la sala: ")
@@ -561,7 +587,7 @@ while True:
                 break
                 
         
-        case 6:
+        case 7:
             decision = input("Escriba C para confirmar la salida del programa, para regresar al menu principal digite cualquier otra tecla: ")
             if decision.upper() == "C":
                 print("*"*70)
