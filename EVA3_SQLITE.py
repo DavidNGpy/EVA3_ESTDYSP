@@ -132,7 +132,7 @@ while True:
                         mi_cursor = conn.cursor()
                         mi_cursor.execute("SELECT ID_SALA, NOMBRE, CAPACIDAD FROM SALAS")
                         lista_salas_data = mi_cursor.fetchall() 
-                        mi_cursor.execute("SELECT ID_SALA, TURNO FROM EVENTOS WHERE DATE(FECHA) = ?", valor)
+                        mi_cursor.execute("SELECT ID_SALA, TURNO FROM EVENTOS WHERE DATE(FECHA) = ? AND ESTADO = 'RESERVADO'", valor)
                         eventos_en_fecha = mi_cursor.fetchall()
                 except Error as e:
                     print(e)
@@ -349,11 +349,11 @@ while True:
             try:
                 with sqlite3.connect("Eventos.db", detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
                     mi_cursor = conn.cursor()
-                    consulta = """
+                    consulta =consulta = """
                         SELECT S.NOMBRE, C.NOMBRE, C.APELLIDO, E.NOMBRE_EVENTO, E.TURNO
                         FROM EVENTOS AS E INNER JOIN SALAS AS S ON E.ID_SALA = S.ID_SALA
                         INNER JOIN CLIENTES AS C ON E.ID_CLIENTE = C.ID_CLIENTE
-                        WHERE DATE(E.FECHA) = ?
+                        WHERE DATE(E.FECHA) = ? AND E.ESTADO = 'RESERVADO'
                     """
                     valores = (fecha_consulta_iso,)
                     mi_cursor.execute(consulta, valores)            
@@ -463,7 +463,7 @@ while True:
         case 4:
             print("\n===============Cancelar reservación===============\n")
             
-            # --- 1. SOLICITAR RANGO DE FECHAS Y MOSTRAR RESERVACIONES ACTIVAS ---
+          
             while True:
                 fecha_inicio_str = input("Ingrese DESDE qué fecha consultar (dd/mm/aaaa): ")
                 try:
@@ -486,6 +486,110 @@ while True:
                 except ValueError:
                     print("Favor de digitar una fecha válida\n")
                     continue
+            ev_en_rango=[]
+            folios_reservados_validos=[]
+
+            try:
+                with sqlite3.connect("Eventos.db", detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    mi_cursor = conn.cursor()
+                   
+                    consulta = """
+                        SELECT E.ID_EVENTO, C.NOMBRE, C.APELLIDO, DATE(E.FECHA), S.NOMBRE
+                        FROM EVENTOS AS E INNER JOIN CLIENTES AS C ON E.ID_CLIENTE = C.ID_CLIENTE
+                        INNER JOIN SALAS AS S ON E.ID_SALA = S.ID_SALA
+                        WHERE DATE(E.FECHA) BETWEEN ? AND ? AND E.ESTADO = 'RESERVADO'
+                        ORDER BY E.FECHA
+                    """
+                    valores = (fecha_inicio_iso, fecha_fin_iso)
+                    mi_cursor.execute(consulta, valores)
+                    eventos_en_rango = mi_cursor.fetchall() 
+                    folios_reservados_validos = [evento[0] for evento in eventos_en_rango]
+            except Error as e:
+                print(f"Error de base de datos al consultar eventos: {e}")
+                continue
+            except:
+                print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                continue
+            if not eventos_en_rango:
+                print(f"\nNo hay reservaciones activas registradas entre {fecha_inicio_str} y {fecha_fin_str}\n")
+                continue
+            else:
+                print(f"\n\t********** RESERVACIONES ACTIVAS entre {fecha_inicio_str} y {fecha_fin_str} **********")
+                
+                filas_tabla_eventos = []
+                for evento in eventos_en_rango:
+                    folio = evento[0]
+                    nombre_cliente = f"{evento[1]} {evento[2]}"
+                    fecha_evento = evento[3]
+                    nombre_sala = evento[4]
+                    filas_tabla_eventos.append([folio, nombre_cliente, fecha_evento, nombre_sala])
+                
+                headers = ["Folio", "Cliente", "Fecha", "Sala"]
+                tabla = tabulate(filas_tabla_eventos, headers, tablefmt="fancy_grid", stralign="center", numalign="center")
+                print(tabla)
+
+                while True:
+                    try:              
+                        folio_a_cancelar = int(input("Ingrese el FOLIO del evento a cancelar (o 0 para salir): "))
+                        if folio_a_cancelar == 0:
+                            break
+                        if folio_a_cancelar not in folios_reservados_validos:
+                            print("Elegir folio de evento dentro de las opciones mostradas\n")
+                            continue
+                    
+                   
+                        evento_seleccionado = None
+                        for evento in eventos_en_rango:
+                            if evento[0] == folio_a_cancelar: 
+                                evento_seleccionado = evento
+                                break
+  
+                        fecha_evento_str = evento_seleccionado[3] 
+            
+                        fecha_evento_dt = dt.datetime.strptime(fecha_evento_str, "%Y-%m-%d").date()
+
+                        diferencia_dias = (fecha_evento_dt - fecha_hoy).days
+
+                        diferencia_dias = (fecha_evento_dt - fecha_hoy).days
+
+                        if diferencia_dias < 2:
+                            print(f"\n Operación rechazada: La cancelación debe realizarse con por lo menos 2 días de anticipación.")
+                            print(f"   Días restantes: {diferencia_dias} (se requieren 2 o más).\n")
+                            continue 
+
+                        break 
+                
+                    except ValueError:
+                        print("Favor de digitar un número válido\n")
+                        continue
+                    except StopIteration:
+                 
+                        print("Error interno: Folio no encontrado.\n")
+                        continue
+                
+            if folio_a_cancelar == 0:
+                continue 
+
+           
+            confirmacion = input(f"\n¿Confirma la cancelación de la reservación con FOLIO {folio_a_cancelar}? (S/N): ").upper()
+
+            if confirmacion == 'S':
+                try:
+                    with sqlite3.connect("Eventos.db") as conn:
+                        mi_cursor = conn.cursor()
+                        
+                        mi_cursor.execute("UPDATE EVENTOS SET ESTADO = 'CANCELADO' WHERE ID_EVENTO = ?", (folio_a_cancelar,))
+                        
+                        print(f"\n Reservación con FOLIO {folio_a_cancelar} registrada como CANCELADA.")
+                        
+                except Error as e:
+                    print(f"Error de base de datos al cancelar: {e}")
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+            else:
+                print("\nOperación de cancelación anulada. Volviendo al menú principal.")
+
+           
         case 5:
             print("\n===============Registrar un cliente===============\n")
             while True:
